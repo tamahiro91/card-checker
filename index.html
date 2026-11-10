@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>カード所持チェッカー</title>
+<style>
+  :root {
+    --bg: #f4f2f0; --panel: #fff; --ink: #2a2a2a; --sub: #777;
+    --sp: #b39a3a; --vi: #d06d78; --ch: #5f8ea0; --st: #6fa585;
+    --on: #e2506e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+    background: var(--bg); color: var(--ink); padding: 0 12px 40px; -webkit-tap-highlight-color: transparent; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 0 8px; }
+  h1 { font-size: 18px; }
+  .total { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 14px; }
+  .bar { flex: 1; height: 8px; background: #ddd; border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--on); width: 0; transition: width .2s; }
+  .tools { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tools button { font-size: 13px; padding: 6px 10px; border: 1px solid #ccc; background: #fff; border-radius: 16px; color: var(--ink); }
+  .tools button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .tools .reset { margin-left: auto; color: #b33; }
+  section { background: var(--panel); border-radius: 10px; margin-top: 14px; overflow: hidden; }
+  section h2 { color: #fff; font-size: 15px; padding: 6px 12px; display: flex; justify-content: space-between; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; padding: 12px; }
+  .card { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
+  .thumb { position: relative; width: 100%; aspect-ratio: 107 / 158; border-radius: 6px; overflow: hidden; cursor: pointer;
+    filter: grayscale(1) opacity(.45); transition: filter .15s; border: 3px solid transparent; }
+  .card.wide .thumb { aspect-ratio: 157 / 108; margin-top: auto; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card.owned .thumb { filter: none; border-color: var(--on); }
+  .badge { position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; padding: 1px 5px; border-radius: 8px; }
+  .counter { display: flex; align-items: center; gap: 4px; }
+  .counter button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #ccc; background: #fff; font-size: 18px; line-height: 1; color: var(--ink); }
+  .counter .n { min-width: 26px; text-align: center; font-weight: bold; font-size: 16px; }
+  .card.owned .counter .n { color: var(--on); }
+  .card.dup .counter .n::after { content: "×"; font-size: 11px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>カード所持チェッカー</h1>
+  <div class="total"><span id="totalText"></span><div class="bar"><i id="totalBar"></i></div></div>
+  <div class="tools">
+    <button data-filter="all" class="active">すべて</button>
+    <button data-filter="missing">未所持</button>
+    <button data-filter="owned">所持</button>
+    <button data-filter="dup">ダブり</button>
+    <button class="reset" id="reset">リセット</button>
+  </div>
+</header>
+<main id="main"></main>
+<script>
+const IMGS = {
+"ch01": "img/ch01.jpg",
+"ch02": "img/ch02.jpg",
+"ch03": "img/ch03.jpg",
+"ch04": "img/ch04.jpg",
+"ch05": "img/ch05.jpg",
+"ch06": "img/ch06.jpg",
+"ch07": "img/ch07.jpg",
+"sp01": "img/sp01.jpg",
+"sp02": "img/sp02.jpg",
+"sp03": "img/sp03.jpg",
+"sp04": "img/sp04.jpg",
+"sp05": "img/sp05.jpg",
+"sp06": "img/sp06.jpg",
+"sp07": "img/sp07.jpg",
+"sp08": "img/sp08.jpg",
+"sp09": "img/sp09.jpg",
+"sp10": "img/sp10.jpg",
+"st01": "img/st01.jpg",
+"st02": "img/st02.jpg",
+"st03": "img/st03.jpg",
+"st04": "img/st04.jpg",
+"st05": "img/st05.jpg",
+"vi01": "img/vi01.jpg",
+"vi02": "img/vi02.jpg",
+"vi03": "img/vi03.jpg",
+"vi04": "img/vi04.jpg",
+"vi05": "img/vi05.jpg",
+"vi06": "img/vi06.jpg",
+"vi07": "img/vi07.jpg",
+"vi08": "img/vi08.jpg"
+};
+const SECTIONS = [
+  { id: 'sp', name: 'スペシャルカード', color: 'var(--sp)', count: 10 },
+  { id: 'vi', name: 'ビジュアルカード', color: 'var(--vi)', count: 8, wide: [6, 7, 8] },
+  { id: 'ch', name: 'キャラクターカード', color: 'var(--ch)', count: 7 },
+  { id: 'st', name: 'ストーリーカード', color: 'var(--st)', count: 5, wide: [1, 2, 3, 4, 5] },
+];
+const KEY = 'card-checker-v1';
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+let filter = 'all';
+
+const main = document.getElementById('main');
+const prefix = { sp: 'SP', vi: 'VI', ch: 'CH', st: 'ST' };
+for (const s of SECTIONS) {
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h2 style="background:${s.color}"><span>${s.name}</span><span data-sec="${s.id}"></span></h2><div class="grid"></div>`;
+  const grid = sec.querySelector('.grid');
+  for (let i = 1; i <= s.count; i++) {
+    const id = s.id + String(i).padStart(2, '0');
+    const el = document.createElement('div');
+    el.className = 'card' + ((s.wide || []).includes(i) ? ' wide' : '');
+    el.dataset.id = id;
+    el.innerHTML = `
+      <div class="thumb"><img src="${IMGS[id]}" alt="${s.name} ${i}"><span class="badge">${prefix[s.id]}-${i}</span></div>
+      <div class="counter"><button data-d="-1" aria-label="減らす">−</button><span class="n"></span><button data-d="1" aria-label="増やす">＋</button></div>`;
+    el.querySelector('.thumb').onclick = () => set(id, (state[id] || 0) > 0 ? 0 : 1);
+    el.querySelectorAll('.counter button').forEach(b => b.onclick = () => set(id, (state[id] || 0) + Number(b.dataset.d)));
+    grid.appendChild(el);
+  }
+  main.appendChild(sec);
+}
+
+function set(id, n) { state[id] = Math.max(0, Math.min(99, n)); save(); render(); }
+
+function render() {
+  let own = 0, all = 0;
+  for (const s of SECTIONS) {
+    let so = 0;
+    for (let i = 1; i <= s.count; i++) {
+      const id = s.id + String(i).padStart(2, '0');
+      const n = state[id] || 0;
+      const el = main.querySelector(`[data-id="${id}"]`);
+      el.classList.toggle('owned', n > 0);
+      el.classList.toggle('dup', n > 1);
+      el.querySelector('.n').textContent = n;
+      const show = filter === 'all' || (filter === 'owned' && n > 0) || (filter === 'missing' && n === 0) || (filter === 'dup' && n > 1);
+      el.classList.toggle('hidden', !show);
+      if (n > 0) so++;
+    }
+    main.querySelector(`[data-sec="${s.id}"]`).textContent = `${so} / ${s.count}`;
+    own += so; all += s.count;
+  }
+  document.getElementById('totalText').textContent = `所持 ${own} / ${all}`;
+  document.getElementById('totalBar').style.width = (own / all * 100) + '%';
+}
+
+document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => {
+  filter = b.dataset.filter;
+  document.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b));
+  render();
+});
+document.getElementById('reset').onclick = () => { if (confirm('すべてのチェックをリセットしますか？')) { state = {}; save(); render(); } };
+render();
+</script>
+</body>
+</html>
