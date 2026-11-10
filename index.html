@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="description" content="カードの所持枚数をチェックできる非公式の簡易ツール。記録はお使いの端末内にのみ保存されます。">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>カード所持チェッカー</title>
 <style>
   :root {
@@ -21,15 +23,17 @@
   .tools { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .tools button { font-size: 13px; padding: 6px 10px; border: 1px solid #ccc; background: #fff; border-radius: 16px; color: var(--ink); }
   .tools button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .tools .reset { margin-left: auto; color: #b33; }
+  .tools .reset { color: #b33; }
   section { background: var(--panel); border-radius: 10px; margin-top: 14px; overflow: hidden; }
   section h2 { color: #fff; font-size: 15px; padding: 6px 12px; display: flex; justify-content: space-between; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; padding: 12px; }
   .card { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
   .thumb { position: relative; width: 100%; aspect-ratio: 107 / 158; border-radius: 6px; overflow: hidden; cursor: pointer;
-    filter: grayscale(1) opacity(.45); transition: filter .15s; border: 3px solid transparent; }
+    filter: grayscale(1) opacity(.5); transition: filter .15s; border: 3px solid transparent; }
   .card.wide .thumb { aspect-ratio: 157 / 108; margin-top: auto; }
-  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb { background: linear-gradient(145deg, color-mix(in srgb, var(--c) 35%, #fff), color-mix(in srgb, var(--c) 75%, #fff)); display: flex; align-items: center; justify-content: center; }
+  .num { font-size: 34px; font-weight: bold; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  .thumb:focus-visible { outline: 3px solid #2a6df4; outline-offset: 2px; }
   .card.owned .thumb { filter: none; border-color: var(--on); }
   .badge { position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; padding: 1px 5px; border-radius: 8px; }
   .counter { display: flex; align-items: center; gap: 4px; }
@@ -37,6 +41,9 @@
   .counter .n { min-width: 26px; text-align: center; font-weight: bold; font-size: 16px; }
   .card.owned .counter .n { color: var(--on); }
   .card.dup .counter .n::after { content: "×"; font-size: 11px; }
+  footer { margin-top: 24px; font-size: 12px; color: var(--sub); line-height: 1.7; }
+  footer p + p { margin-top: 6px; }
+  footer a { color: inherit; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -49,43 +56,19 @@
     <button data-filter="missing">未所持</button>
     <button data-filter="owned">所持</button>
     <button data-filter="dup">ダブり</button>
+    <button id="backup">バックアップ</button>
+    <button id="restore">復元</button>
+    <input type="file" id="file" accept="application/json,.json" class="hidden">
     <button class="reset" id="reset">リセット</button>
   </div>
 </header>
 <main id="main"></main>
+<footer>
+  <p>非公式のファンメイドツールです。各カード・キャラクター等の権利は、それぞれの権利者に帰属します。権利者・関係各社とは一切関係ありません。</p>
+  <p>記録はお使いの端末のブラウザ内にのみ保存され、外部には送信されません。ブラウザのデータを消すと記録も消えるため、「バックアップ」で保存しておくと安心です。</p>
+  <p>無保証・無料で提供しています（<a href="https://github.com/tamahiro91/card-checker/blob/main/LICENSE">MIT License</a>）。</p>
+</footer>
 <script>
-const IMGS = {
-"ch01": "img/ch01.jpg",
-"ch02": "img/ch02.jpg",
-"ch03": "img/ch03.jpg",
-"ch04": "img/ch04.jpg",
-"ch05": "img/ch05.jpg",
-"ch06": "img/ch06.jpg",
-"ch07": "img/ch07.jpg",
-"sp01": "img/sp01.jpg",
-"sp02": "img/sp02.jpg",
-"sp03": "img/sp03.jpg",
-"sp04": "img/sp04.jpg",
-"sp05": "img/sp05.jpg",
-"sp06": "img/sp06.jpg",
-"sp07": "img/sp07.jpg",
-"sp08": "img/sp08.jpg",
-"sp09": "img/sp09.jpg",
-"sp10": "img/sp10.jpg",
-"st01": "img/st01.jpg",
-"st02": "img/st02.jpg",
-"st03": "img/st03.jpg",
-"st04": "img/st04.jpg",
-"st05": "img/st05.jpg",
-"vi01": "img/vi01.jpg",
-"vi02": "img/vi02.jpg",
-"vi03": "img/vi03.jpg",
-"vi04": "img/vi04.jpg",
-"vi05": "img/vi05.jpg",
-"vi06": "img/vi06.jpg",
-"vi07": "img/vi07.jpg",
-"vi08": "img/vi08.jpg"
-};
 const SECTIONS = [
   { id: 'sp', name: 'スペシャルカード', color: 'var(--sp)', count: 10 },
   { id: 'vi', name: 'ビジュアルカード', color: 'var(--vi)', count: 8, wide: [6, 7, 8] },
@@ -110,9 +93,12 @@ for (const s of SECTIONS) {
     el.className = 'card' + ((s.wide || []).includes(i) ? ' wide' : '');
     el.dataset.id = id;
     el.innerHTML = `
-      <div class="thumb"><img src="${IMGS[id]}" alt="${s.name} ${i}"><span class="badge">${prefix[s.id]}-${i}</span></div>
+      <div class="thumb" role="button" tabindex="0" aria-label="${s.name} ${i}" style="--c:${s.color}"><span class="num">${i}</span><span class="badge">${prefix[s.id]}-${i}</span></div>
       <div class="counter"><button data-d="-1" aria-label="減らす">−</button><span class="n"></span><button data-d="1" aria-label="増やす">＋</button></div>`;
-    el.querySelector('.thumb').onclick = () => set(id, (state[id] || 0) > 0 ? 0 : 1);
+    const th = el.querySelector('.thumb');
+    const tog = () => set(id, (state[id] || 0) > 0 ? 0 : 1);
+    th.onclick = tog;
+    th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tog(); } };
     el.querySelectorAll('.counter button').forEach(b => b.onclick = () => set(id, (state[id] || 0) + Number(b.dataset.d)));
     grid.appendChild(el);
   }
@@ -148,6 +134,25 @@ document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => {
   document.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b));
   render();
 });
+document.getElementById('backup').onclick = () => {
+  const blob = new Blob([JSON.stringify({ app: 'card-checker', v: 1, counts: state })], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'card-checker-backup.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+document.getElementById('restore').onclick = () => document.getElementById('file').click();
+document.getElementById('file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (d.app !== 'card-checker' || typeof d.counts !== 'object' || d.counts === null) throw 0;
+    const next = {};
+    for (const [k, v] of Object.entries(d.counts)) if (/^(sp|vi|ch|st)\d{2}$/.test(k) && Number.isInteger(v) && v > 0) next[k] = Math.min(v, 99);
+    if (!confirm('現在の記録をバックアップの内容で置き換えますか？')) return;
+    state = next; save(); render();
+  } catch (err) { alert('このファイルは読み込めませんでした。'); }
+};
 document.getElementById('reset').onclick = () => { if (confirm('すべてのチェックをリセットしますか？')) { state = {}; save(); render(); } };
 render();
 </script>
