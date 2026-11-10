@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>カード所持チェッカー</title>
 <style>
   :root {
@@ -12,7 +12,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-    background: var(--bg); color: var(--ink); padding: 0 12px 40px; -webkit-tap-highlight-color: transparent; }
+    background: var(--bg); color: var(--ink); padding: 0 12px 40px; -webkit-tap-highlight-color: transparent; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
   header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 0 8px; }
   h1 { font-size: 18px; }
   .total { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 14px; }
