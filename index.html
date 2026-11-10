@@ -32,6 +32,8 @@
     filter: grayscale(1) opacity(.5); transition: filter .15s; border: 3px solid transparent; }
   .card.wide .thumb { aspect-ratio: 157 / 108; margin-top: auto; }
   .thumb { background: linear-gradient(145deg, color-mix(in srgb, var(--c) 35%, #fff), color-mix(in srgb, var(--c) 75%, #fff)); display: flex; align-items: center; justify-content: center; }
+  .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb img + .num { display: none; }
   .num { font-size: 34px; font-weight: bold; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
   .thumb:focus-visible { outline: 3px solid #2a6df4; outline-offset: 2px; }
   .card.owned .thumb { filter: none; border-color: var(--on); }
@@ -93,7 +95,7 @@ for (const s of SECTIONS) {
     el.className = 'card' + ((s.wide || []).includes(i) ? ' wide' : '');
     el.dataset.id = id;
     el.innerHTML = `
-      <div class="thumb" role="button" tabindex="0" aria-label="${s.name} ${i}" style="--c:${s.color}"><span class="num">${i}</span><span class="badge">${prefix[s.id]}-${i}</span></div>
+      <div class="thumb" role="button" tabindex="0" aria-label="${s.name} ${i}" style="--c:${s.color}"><img src="img/${id}.jpg" alt="" draggable="false"><span class="num">${i}</span><span class="badge">${prefix[s.id]}-${i}</span></div>
       <div class="counter"><button data-d="-1" aria-label="減らす">−</button><span class="n"></span><button data-d="1" aria-label="増やす">＋</button></div>`;
     const th = el.querySelector('.thumb');
     const tog = () => set(id, (state[id] || 0) > 0 ? 0 : 1);
